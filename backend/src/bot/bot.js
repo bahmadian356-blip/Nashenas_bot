@@ -8,7 +8,7 @@ const bot = new Telegraf(env.BOT_TOKEN);
 
 // Helper: builds the "Open Mini App" button, reused across messages.
 function openAppButton(path = '') {
-  const url = path ? `${env.TELEGRAM_WEBAPP_URL}${path}` : env.TELEGRAM_WEBAPP_URL;
+  const url = path ? `${env.TELEGRAM_WEBAPP_URL}/#${path}` : env.TELEGRAM_WEBAPP_URL;
   return Markup.inlineKeyboard([Markup.button.webApp('📱 باز کردن Mini App', url)]);
 }
 
@@ -41,22 +41,20 @@ bot.command('menu', async (ctx) => {
   await ctx.reply(
     'منوی اصلی:',
     Markup.inlineKeyboard([
-      [Markup.button.webApp('💬 پیام‌های من', `${env.TELEGRAM_WEBAPP_URL}/messages`)],
-      [Markup.button.webApp('🎁 ارسال گیفت', `${env.TELEGRAM_WEBAPP_URL}/gifts`)],
-      [Markup.button.webApp('🔗 لینک ناشناس من', `${env.TELEGRAM_WEBAPP_URL}/profile`)],
-      [Markup.button.webApp('👤 پروفایل', `${env.TELEGRAM_WEBAPP_URL}/profile`)],
-      [Markup.button.webApp('🚫 بلاک‌شده‌ها', `${env.TELEGRAM_WEBAPP_URL}/blocked`)],
-      [Markup.button.webApp('⚙️ تنظیمات', `${env.TELEGRAM_WEBAPP_URL}/settings`)],
+      [Markup.button.webApp('💬 پیام‌های من', `${env.TELEGRAM_WEBAPP_URL}/#/messages`)],
+      [Markup.button.webApp('🎁 ارسال گیفت', `${env.TELEGRAM_WEBAPP_URL}/#/gifts`)],
+      [Markup.button.webApp('🔗 لینک ناشناس من', `${env.TELEGRAM_WEBAPP_URL}/#/profile`)],
+      [Markup.button.webApp('👤 پروفایل', `${env.TELEGRAM_WEBAPP_URL}/#/profile`)],
+      [Markup.button.webApp('🚫 بلاک‌شده‌ها', `${env.TELEGRAM_WEBAPP_URL}/#/blocked`)],
+      [Markup.button.webApp('⚙️ تنظیمات', `${env.TELEGRAM_WEBAPP_URL}/#/settings`)],
     ])
   );
 });
 
 // ---------------------------------------------------------------------
-// Telegram Stars payment flow (feature #16-19)
+// Telegram Stars payment flow
 // ---------------------------------------------------------------------
 
-// Telegram asks us to approve every checkout before charging the user.
-// We just confirm the payload corresponds to a payment we actually created.
 bot.on('pre_checkout_query', async (ctx) => {
   try {
     const payload = ctx.preCheckoutQuery.invoice_payload;
@@ -78,8 +76,6 @@ bot.on('pre_checkout_query', async (ctx) => {
   }
 });
 
-// Telegram confirms the Stars charge succeeded — this is the source of
-// truth that actually grants the gift. Never grant a gift anywhere else.
 bot.on('message', async (ctx, next) => {
   const successfulPayment = ctx.message && ctx.message.successful_payment;
   if (!successfulPayment) return next();
@@ -105,7 +101,7 @@ bot.on('message', async (ctx, next) => {
       await ctx.telegram.sendMessage(
         receiver.telegram_user_id,
         '🎁 یک هدیه‌ی جدید و ناشناس دریافت کردید! برای دیدنش Mini App رو باز کن.',
-        Markup.inlineKeyboard([[Markup.button.webApp('🎁 مشاهده هدیه', `${env.TELEGRAM_WEBAPP_URL}/gifts`)]])
+        Markup.inlineKeyboard([[Markup.button.webApp('🎁 مشاهده هدیه', `${env.TELEGRAM_WEBAPP_URL}/#/gifts`)]])
       );
     }
   } catch (err) {
