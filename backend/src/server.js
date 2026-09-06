@@ -9,6 +9,7 @@ const meRoutes = require('./api/routes/me');
 const linksRoutes = require('./api/routes/links');
 const messagesRoutes = require('./api/routes/messages');
 const blocksRoutes = require('./api/routes/blocks');
+const giftsRoutes = require('./api/routes/gifts');
 
 const app = express();
 
@@ -36,8 +37,6 @@ app.use('/api', apiLimiter);
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 // --- Telegram bot webhook ---
-// Render terminates TLS for us, so this path just needs to be unguessable-ish
-// and match exactly what we register with Telegram in setupWebhook().
 const WEBHOOK_PATH = `/telegraf/${env.BOT_TOKEN}`;
 app.use(bot.webhookCallback(WEBHOOK_PATH));
 
@@ -46,8 +45,9 @@ app.use('/api/me', requireTelegramAuth, meRoutes);
 app.use('/api/links', requireTelegramAuth, linksRoutes);
 app.use('/api/messages', requireTelegramAuth, messagesRoutes);
 app.use('/api/blocks', requireTelegramAuth, blocksRoutes);
-// Further routers (gifts, payments...) are mounted here in later steps,
-// each behind the same requireTelegramAuth middleware.
+app.use('/api/gifts', requireTelegramAuth, giftsRoutes);
+// Further routers are mounted here in later steps, each behind the
+// same requireTelegramAuth middleware.
 
 // --- 404 fallback ---
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
