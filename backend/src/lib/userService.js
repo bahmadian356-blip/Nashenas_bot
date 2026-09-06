@@ -3,7 +3,6 @@ const supabase = require('./supabaseClient');
 
 /**
  * Generates a short, URL-safe, hard-to-guess slug for anonymous links.
- * 8 chars of base32-ish alphabet -> ~40 bits of entropy, plenty for this use case.
  */
 function generateSlug(length = 8) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I ambiguity
@@ -33,7 +32,6 @@ async function getOrCreateUser(telegramUser) {
   if (findError) throw findError;
 
   if (existing) {
-    // Keep profile fields fresh on every login.
     const { data: updated, error: updateError } = await supabase
       .from('users')
       .update({
@@ -49,7 +47,6 @@ async function getOrCreateUser(telegramUser) {
     return updated;
   }
 
-  // New user: create the row, then create their first anonymous link.
   const { data: created, error: createError } = await supabase
     .from('users')
     .insert({
@@ -63,4 +60,44 @@ async function getOrCreateUser(telegramUser) {
 
   if (createError) throw createError;
 
-  // Retry a coup
+  let link = null;
+  for (let attempt = 0; attempt < 5 && !link; attempt++) {
+    const slug = generateSlug();
+    const { data, error } = await supabase
+      .from('anonymous_links')
+      .insert({ user_id: created.id, slug, is_active: true })
+      .select('*')
+      .maybeSingle();
+
+    if (!error) link = data;
+    else if (error.code !== '23505') throw error;
+  }
+
+  if (!link) throw new Error('Could not allocate a unique anonymous link slug');
+
+  return created;
+}
+
+async function markOnline(userId) {
+  await supabase
+    .from('users')
+    .update({ is_online: true, last_seen: new Date().toISOString() })
+    .eq('id', userId);
+
+  await supabase
+    .from('presence')
+    .upsert({ user_id: userId, is_online: true, last_ping_at: new Date().toISOString() });
+}
+
+async function markOffline(userId) {
+  await supabase
+    .from('users')
+    .update({ is_online: false, last_seen: new Date().toISOString() })
+    .eq('id', userId);
+
+  await supabase
+    .from('presence')
+    .upsert({ user_id: userId, is_online: false, last_ping_at: new Date().toISOString() });
+}
+
+module.exports = { getOrCreateUser, markOnline, markOffline, generateSlug };
