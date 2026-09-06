@@ -12,6 +12,15 @@ const blocksRoutes = require('./api/routes/blocks');
 const giftsRoutes = require('./api/routes/gifts');
 
 const app = express();
+app.set('trust proxy', 1); // Render sits behind a proxy — needed for express-rate-limit to work correctly
+
+// --- Telegram bot webhook ---
+// MUST be mounted before express.json(): Telegraf reads the raw request
+// body itself, and if express.json() runs first it consumes the stream,
+// leaving the bot with nothing to parse (it fails silently — no reply,
+// no error). Order matters here.
+const WEBHOOK_PATH = `/telegraf/${env.BOT_TOKEN}`;
+app.use(bot.webhookCallback(WEBHOOK_PATH));
 
 app.use(express.json());
 
@@ -36,18 +45,14 @@ app.use('/api', apiLimiter);
 // --- Health check (feature #25, required by Render) ---
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
-// --- Telegram bot webhook ---
-const WEBHOOK_PATH = `/telegraf/${env.BOT_TOKEN}`;
-app.use(bot.webhookCallback(WEBHOOK_PATH));
-
 // --- Authenticated Mini App API routes ---
 app.use('/api/me', requireTelegramAuth, meRoutes);
 app.use('/api/links', requireTelegramAuth, linksRoutes);
 app.use('/api/messages', requireTelegramAuth, messagesRoutes);
 app.use('/api/blocks', requireTelegramAuth, blocksRoutes);
 app.use('/api/gifts', requireTelegramAuth, giftsRoutes);
-// Further routers are mounted here in later steps, each behind the
-// same requireTelegramAuth middleware.
+// Further routers (payments admin, etc.) are mounted here in later steps,
+// each behind the same requireTelegramAuth middleware.
 
 // --- 404 fallback ---
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
