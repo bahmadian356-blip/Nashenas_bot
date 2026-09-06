@@ -1,6 +1,8 @@
 const { Telegraf, Markup } = require('telegraf');
 const env = require('../config/env');
 const { getOrCreateUser } = require('../lib/userService');
+const { finalizeGiftPayment } = require('../lib/giftService');
+const supabase = require('../lib/supabaseClient');
 
 const bot = new Telegraf(env.BOT_TOKEN);
 
@@ -32,11 +34,9 @@ bot.command('app', async (ctx) => {
 });
 
 bot.command('see', async (ctx) => {
-  // Placeholder for now — wired up to real unread messages in a later step.
   await ctx.reply('برای دیدن پیام‌های خوندنشده، Mini App رو باز کن:', openAppButton('/messages'));
 });
 
-// Main menu, mirrors feature #27 of the spec.
 bot.command('menu', async (ctx) => {
   await ctx.reply(
     'منوی اصلی:',
@@ -49,6 +49,68 @@ bot.command('menu', async (ctx) => {
       [Markup.button.webApp('⚙️ تنظیمات', `${env.TELEGRAM_WEBAPP_URL}/settings`)],
     ])
   );
+});
+
+// ---------------------------------------------------------------------
+// Telegram Stars payment flow (feature #16-19)
+// ---------------------------------------------------------------------
+
+// Telegram asks us to approve every checkout before charging the user.
+// We just confirm the payload corresponds to a payment we actually created.
+bot.on('pre_checkout_query', async (ctx) => {
+  try {
+    const payload = ctx.preCheckoutQuery.invoice_payload;
+    const { data: payment, error } = await supabase
+      .from('payments')
+      .select('id, status, amount_stars')
+      .eq('invoice_payload', payload)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const valid =
+      payment && payment.status === 'pending' && payment.amount_stars === ctx.preCheckoutQuery.total_amount;
+
+    await ctx.answerPreCheckoutQuery(!!valid, valid ? undefined : 'این پرداخت دیگر معتبر نیست.');
+  } catch (err) {
+    console.error('pre_checkout_query error:', err.message);
+    await ctx.answerPreCheckoutQuery(false, 'خطایی رخ داد، لطفاً دوباره تلاش کنید.');
+  }
+});
+
+// Telegram confirms the Stars charge succeeded — this is the source of
+// truth that actually grants the gift. Never grant a gift anywhere else.
+bot.on('message', async (ctx, next) => {
+  const successfulPayment = ctx.message && ctx.message.successful_payment;
+  if (!successfulPayment) return next();
+
+  try {
+    const { transaction, alreadyProcessed } = await finalizeGiftPayment({
+      invoicePayload: successfulPayment.invoice_payload,
+      telegramPaymentChargeId: successfulPayment.telegram_payment_charge_id,
+      providerPaymentChargeId: successfulPayment.provider_payment_charge_id,
+    });
+
+    if (alreadyProcessed) return;
+
+    await ctx.reply('✅ پرداخت با موفقیت انجام شد.\n\n🎁 Gift شما با موفقیت به پروفایل کاربر ارسال شد.');
+
+    const { data: receiver } = await supabase
+      .from('users')
+      .select('telegram_user_id')
+      .eq('id', transaction.receiver_id)
+      .maybeSingle();
+
+    if (receiver) {
+      await ctx.telegram.sendMessage(
+        receiver.telegram_user_id,
+        '🎁 یک هدیه‌ی جدید و ناشناس دریافت کردید! برای دیدنش Mini App رو باز کن.',
+        Markup.inlineKeyboard([[Markup.button.webApp('🎁 مشاهده هدیه', `${env.TELEGRAM_WEBAPP_URL}/gifts`)]])
+      );
+    }
+  } catch (err) {
+    console.error('successful_payment handling failed:', err.message);
+  }
 });
 
 bot.catch((err, ctx) => {
