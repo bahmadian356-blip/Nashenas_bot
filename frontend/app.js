@@ -1,7 +1,7 @@
 // =====================================================================
 // CONFIG — change this to your deployed backend URL on Render
 // =====================================================================
-const API_BASE = 'https://YOUR-BACKEND-NAME.onrender.com';
+const API_BASE = 'https://nashenas-bot-2.onrender.com';
 
 // =====================================================================
 // Telegram WebApp setup
