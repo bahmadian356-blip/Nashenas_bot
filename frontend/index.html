@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>پیام‌رسان ناشناس</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <nav id="bottom-nav" class="bottom-nav">
+    <a href="#/home" class="nav-item" data-route="home">
+      <span class="nav-icon">🏠</span><span>خانه</span>
+    </a>
+    <a href="#/messages" class="nav-item" data-route="messages">
+      <span class="nav-icon">💬</span><span>پیام‌ها</span>
+      <span id="nav-unread-badge" class="badge hidden">0</span>
+    </a>
+    <a href="#/gifts" class="nav-item" data-route="gifts">
+      <span class="nav-icon">🎁</span><span>گیفت‌ها</span>
+    </a>
+    <a href="#/profile" class="nav-item" data-route="profile">
+      <span class="nav-icon">👤</span><span>پروفایل</span>
+    </a>
+  </nav>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
