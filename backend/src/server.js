@@ -10,7 +10,7 @@ const linksRoutes = require('./api/routes/links');
 const messagesRoutes = require('./api/routes/messages');
 const blocksRoutes = require('./api/routes/blocks');
 const giftsRoutes = require('./api/routes/gifts');
-const { ensureBotUsername } = require('./lib/botInfo');
+const conversationsRoutes = require('./api/routes/conversations');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -43,8 +43,11 @@ app.use('/api/links', requireTelegramAuth, linksRoutes);
 app.use('/api/messages', requireTelegramAuth, messagesRoutes);
 app.use('/api/blocks', requireTelegramAuth, blocksRoutes);
 app.use('/api/gifts', requireTelegramAuth, giftsRoutes);
+app.use('/api/conversations', requireTelegramAuth, conversationsRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+
+const { ensureBotUsername } = require('./lib/botInfo');
 
 async function setupWebhook() {
   const webhookUrl = `${env.BACKEND_PUBLIC_URL}${WEBHOOK_PATH}`;
