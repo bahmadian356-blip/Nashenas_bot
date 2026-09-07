@@ -10,21 +10,16 @@ const linksRoutes = require('./api/routes/links');
 const messagesRoutes = require('./api/routes/messages');
 const blocksRoutes = require('./api/routes/blocks');
 const giftsRoutes = require('./api/routes/gifts');
+const { ensureBotUsername } = require('./lib/botInfo');
 
 const app = express();
-app.set('trust proxy', 1); // Render sits behind a proxy — needed for express-rate-limit to work correctly
+app.set('trust proxy', 1);
 
-// --- Telegram bot webhook ---
-// MUST be mounted before express.json(): Telegraf reads the raw request
-// body itself, and if express.json() runs first it consumes the stream,
-// leaving the bot with nothing to parse (it fails silently — no reply,
-// no error). Order matters here.
 const WEBHOOK_PATH = `/telegraf/${env.BOT_TOKEN}`;
 app.use(bot.webhookCallback(WEBHOOK_PATH));
 
 app.use(express.json());
 
-// --- CORS: only the Mini App's own origin(s) may call this API ---
 app.use(
   cors({
     origin: env.ALLOWED_ORIGINS.length > 0 ? env.ALLOWED_ORIGINS : false,
@@ -33,34 +28,30 @@ app.use(
   })
 );
 
-// --- Basic anti-spam rate limiting on the whole API (feature #24) ---
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 60, // 60 requests/minute/IP is generous for normal Mini App usage
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
 });
 app.use('/api', apiLimiter);
 
-// --- Health check (feature #25, required by Render) ---
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
-// --- Authenticated Mini App API routes ---
 app.use('/api/me', requireTelegramAuth, meRoutes);
 app.use('/api/links', requireTelegramAuth, linksRoutes);
 app.use('/api/messages', requireTelegramAuth, messagesRoutes);
 app.use('/api/blocks', requireTelegramAuth, blocksRoutes);
 app.use('/api/gifts', requireTelegramAuth, giftsRoutes);
-// Further routers (payments admin, etc.) are mounted here in later steps,
-// each behind the same requireTelegramAuth middleware.
 
-// --- 404 fallback ---
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
 async function setupWebhook() {
   const webhookUrl = `${env.BACKEND_PUBLIC_URL}${WEBHOOK_PATH}`;
   await bot.telegram.setWebhook(webhookUrl);
   console.log(`Telegram webhook set to ${webhookUrl}`);
+  const username = await ensureBotUsername(bot);
+  console.log(`Bot username cached: @${username}`);
 }
 
 app.listen(env.PORT, async () => {
