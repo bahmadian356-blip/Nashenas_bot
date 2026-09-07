@@ -1,14 +1,18 @@
 const { Markup } = require('telegraf');
 const supabase = require('./supabaseClient');
-const env = require('../config/env');
 
 function getBot() {
   return require('../bot/bot');
 }
 
-async function notifyNewMessage(receiverTelegramUserId, receiverUserId) {
+/**
+ * Pushes a new anonymous message directly into the receiver's chat with
+ * the bot — the message TEXT itself is included, with inline buttons to
+ * reply / block / delete right there in Telegram, no Mini App required.
+ */
+async function notifyNewMessage(receiverTelegramUserId, message) {
   await supabase.from('notifications').insert({
-    user_id: receiverUserId,
+    user_id: message.receiver_id,
     type: 'new_message',
     payload: {},
   });
@@ -17,9 +21,13 @@ async function notifyNewMessage(receiverTelegramUserId, receiverUserId) {
     const bot = getBot();
     await bot.telegram.sendMessage(
       receiverTelegramUserId,
-      '📩 شما یک پیام جدید دارید.\n\nبرای مشاهده پیام /see را ارسال کنید.',
+      `📩 یک پیام ناشناس جدید دارید:\n\n${message.text}`,
       Markup.inlineKeyboard([
-        [Markup.button.webApp('👀 مشاهده پیام', `${env.TELEGRAM_WEBAPP_URL}/#/messages`)],
+        [
+          Markup.button.callback('↩️ پاسخ', `r:${message.id}`),
+          Markup.button.callback('🚫 بلاک', `b:${message.id}`),
+          Markup.button.callback('🗑 حذف', `d:${message.id}`),
+        ],
       ])
     );
   } catch (err) {
