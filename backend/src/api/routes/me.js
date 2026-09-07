@@ -1,11 +1,16 @@
 const express = require('express');
 const supabase = require('../../lib/supabaseClient');
-const env = require('../../config/env');
 const { generateSlug } = require('../../lib/userService');
+const { ensureBotUsername } = require('../../lib/botInfo');
 
 const router = express.Router();
 
-// GET /api/me — returns the current user's profile + their active anonymous link.
+async function buildDeepLink(slug) {
+  const bot = require('../../bot/bot');
+  const username = await ensureBotUsername(bot);
+  return `https://t.me/${username}?start=msg_${slug}`;
+}
+
 router.get('/', async (req, res) => {
   const { data: link, error } = await supabase
     .from('anonymous_links')
@@ -29,12 +34,11 @@ router.get('/', async (req, res) => {
     show_last_seen: req.user.show_last_seen,
     show_online_status: req.user.show_online_status,
     allow_anonymous_messages: req.user.allow_anonymous_messages,
-    anonymous_link: link ? `${env.TELEGRAM_WEBAPP_URL}/#/u/${link.slug}` : null,
+    anonymous_link: link ? await buildDeepLink(link.slug) : null,
     anonymous_slug: link ? link.slug : null,
   });
 });
 
-// PATCH /api/me/settings — update privacy toggles
 router.patch('/settings', async (req, res) => {
   const allowed = ['allow_anonymous_messages', 'show_last_seen', 'show_online_status'];
   const updates = {};
@@ -58,7 +62,6 @@ router.patch('/settings', async (req, res) => {
   res.json({ ok: true, updated: updates });
 });
 
-// PATCH /api/me/link/regenerate — deactivate the old link, create a new one
 router.patch('/link/regenerate', async (req, res) => {
   const { error: deactivateError } = await supabase
     .from('anonymous_links')
@@ -89,7 +92,7 @@ router.patch('/link/regenerate', async (req, res) => {
 
   if (!newLink) return res.status(500).json({ error: 'Could not generate a new link' });
 
-  res.json({ anonymous_link: `${env.TELEGRAM_WEBAPP_URL}/#/u/${newLink.slug}`, anonymous_slug: newLink.slug });
+  res.json({ anonymous_link: await buildDeepLink(newLink.slug), anonymous_slug: newLink.slug });
 });
 
-module.exports = router;module.exports = router;
+module.exports = router;
