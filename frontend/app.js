@@ -1,5 +1,5 @@
 // =====================================================================
-// CONFIG
+// CONFIG — change this to your deployed backend URL on Render
 // =====================================================================
 const API_BASE = 'https://nashenas-bot-2.onrender.com';
 
@@ -88,9 +88,16 @@ function parseHash() {
   return { path: pathPart, params };
 }
 
+let chatPollTimer = null;
+
 async function renderRoute() {
   const { path, params } = parseHash();
   updateActiveNav(path);
+
+  if (!path.startsWith('/chat/')) {
+    document.body.classList.remove('chat-open');
+    clearInterval(chatPollTimer);
+  }
 
   for (const pattern of Object.keys(routes)) {
     const match = matchRoute(pattern, path);
@@ -158,8 +165,8 @@ function initials(name) {
 // =====================================================================
 async function refreshUnreadBadge() {
   try {
-    const data = await api('/api/messages/inbox?limit=100');
-    const unread = data.messages.filter((m) => !m.read_at).length;
+    const data = await api('/api/conversations');
+    const unread = data.conversations.reduce((sum, c) => sum + c.unread_count, 0);
     const badge = document.getElementById('nav-unread-badge');
     if (unread > 0) {
       badge.textContent = unread > 99 ? '99+' : unread;
@@ -177,11 +184,11 @@ async function refreshUnreadBadge() {
 // =====================================================================
 route('/home', async () => {
   const me = await api('/api/me');
-  const [inbox, giftsMy] = await Promise.all([
-    api('/api/messages/inbox?limit=5'),
+  const [convos, giftsMy] = await Promise.all([
+    api('/api/conversations'),
     api('/api/gifts/received').catch(() => ({ gifts: [] })),
   ]);
-  const unread = inbox.messages.filter((m) => !m.read_at).length;
+  const unread = convos.conversations.reduce((sum, c) => sum + c.unread_count, 0);
 
   document.getElementById('app').innerHTML = `
     <div class="card row">
@@ -232,89 +239,148 @@ route('/home', async () => {
 });
 
 // =====================================================================
-// PAGE: Messages (inbox / outbox tabs)
+// PAGE: Conversations list (like a chat list)
 // =====================================================================
-route('/messages', async (_, params) => {
-  const tab = params.get('tab') === 'sent' ? 'sent' : 'inbox';
-  const data = tab === 'inbox' ? await api('/api/messages/inbox') : await api('/api/messages/outbox');
-  const messages = data.messages;
+route('/messages', async () => {
+  document.body.classList.remove('chat-open');
+  const { conversations } = await api('/api/conversations');
 
-  const listHtml = messages.length
-    ? messages.map((m) => renderMessageItem(m, tab)).join('')
-    : `<div class="empty-state"><span class="emoji">📭</span>پیامی وجود ندارد</div>`;
+  const listHtml = conversations.length
+    ? conversations
+        .map(
+          (c) => `
+        <a class="conv-item" href="#/chat/${c.counterpart_id}">
+          ${
+            c.avatar_url
+              ? `<img class="avatar" src="${c.avatar_url}" />`
+              : `<div class="avatar">${c.revealed ? initials(c.name) : '❔'}</div>`
+          }
+          <div style="flex:1; min-width:0;">
+            <div class="row">
+              <span style="font-weight:700;">${escapeHtml(c.name)}</span>
+              <span class="muted">${timeAgo(c.last_message_at)}</span>
+            </div>
+            <div class="muted" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(c.last_message)}</div>
+          </div>
+          ${c.unread_count > 0 ? `<span class="badge" style="position:static;">${c.unread_count}</span>` : ''}
+        </a>`
+        )
+        .join('')
+    : `<div class="empty-state"><span class="emoji">💬</span>هنوز هیچ مکالمه‌ای نداری</div>`;
 
   document.getElementById('app').innerHTML = `
     <div class="page-title">پیام‌ها</div>
-    <div class="tabs">
-      <div class="tab ${tab === 'inbox' ? 'active' : ''}" id="tab-inbox">دریافتی</div>
-      <div class="tab ${tab === 'sent' ? 'active' : ''}" id="tab-sent">ارسالی</div>
-    </div>
-    <div id="message-list">${listHtml}</div>
+    ${listHtml}
   `;
-
-  document.getElementById('tab-inbox').onclick = () => (window.location.hash = '#/messages?tab=inbox');
-  document.getElementById('tab-sent').onclick = () => (window.location.hash = '#/messages?tab=sent');
-
-  document.querySelectorAll('[data-action]').forEach((btn) => {
-    btn.onclick = () => handleMessageAction(btn.dataset.action, btn.dataset.id, tab);
-  });
 
   refreshUnreadBadge();
 });
 
-function renderMessageItem(m, tab) {
-  const isInbox = tab === 'inbox';
+// =====================================================================
+// PAGE: Chat thread (real conversation view)
+// =====================================================================
+route('/chat/:id', async (match) => {
+  document.body.classList.add('chat-open');
+  clearInterval(chatPollTimer);
+
+  await loadChatThread(match.id);
+  chatPollTimer = setInterval(() => loadChatThread(match.id, true), 4000);
+});
+
+async function loadChatThread(counterpartId, silent = false) {
+  let data;
+  try {
+    data = await api(`/api/conversations/${counterpartId}`);
+  } catch (err) {
+    if (!silent) {
+      document.getElementById('app').innerHTML = `<div class="empty-state"><span class="emoji">⚠️</span>${escapeHtml(err.message)}</div>`;
+    }
+    return;
+  }
+
+  const { counterpart, messages } = data;
+  const app = document.getElementById('app');
+
+  const wasNearBottom =
+    !silent || (app.querySelector('#chat-scroll') && isNearBottom(app.querySelector('#chat-scroll')));
+
+  const statusLine = counterpart.is_online
+    ? '🟢 آنلاین'
+    : counterpart.last_seen
+    ? 'آخرین بازدید: ' + timeAgo(counterpart.last_seen)
+    : '';
+
+  app.innerHTML = `
+    <div class="chat-header">
+      <a href="#/messages" class="back-link">◀ بازگشت</a>
+      <div class="row" style="margin-top:6px;">
+        ${
+          counterpart.avatar_url
+            ? `<img class="avatar" src="${counterpart.avatar_url}" />`
+            : `<div class="avatar">${counterpart.revealed ? initials(counterpart.name) : '❔'}</div>`
+        }
+        <div style="flex:1;">
+          <div style="font-weight:700;">${escapeHtml(counterpart.name)}</div>
+          <div class="muted">${statusLine}</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="chat-scroll" class="chat-scroll">
+      ${messages.map(renderBubble).join('')}
+    </div>
+
+    <div class="composer">
+      <textarea class="input" id="chat-input" rows="1" placeholder="پیامت رو بنویس..."></textarea>
+      <button class="btn small" id="chat-send-btn">ارسال</button>
+    </div>
+  `;
+
+  const scrollEl = document.getElementById('chat-scroll');
+  if (wasNearBottom) scrollEl.scrollTop = scrollEl.scrollHeight;
+
+  document.getElementById('chat-send-btn').onclick = () => sendChatMessage(counterpartId);
+  document.getElementById('chat-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage(counterpartId);
+    }
+  });
+}
+
+function isNearBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+}
+
+function renderBubble(m) {
   return `
-    <div class="message-item ${isInbox && !m.read_at ? 'unread' : ''}">
-      <div class="message-meta">
-        <span>${isInbox ? '📩 پیام ناشناس' : m.users ? 'به: ' + escapeHtml(m.users.display_name) : 'ارسال‌شده'}</span>
-        <span>${timeAgo(m.created_at)}</span>
-      </div>
-      <div class="message-text">${escapeHtml(m.text)}${m.edited_at ? ' <span class="muted">(ویرایش‌شده)</span>' : ''}</div>
-      <div class="message-meta">
-        <span>${!isInbox ? (m.read_at ? '✓ مشاهده شد' : 'ارسال شد') : ''}</span>
-      </div>
-      <div class="message-actions">
-        ${isInbox && !m.read_at ? `<button class="icon-btn" data-action="read" data-id="${m.id}">👀 خوندم</button>` : ''}
-        ${isInbox ? `<button class="icon-btn" data-action="reply" data-id="${m.id}">↩️ پاسخ</button>` : ''}
-        ${isInbox ? `<button class="icon-btn" data-action="block" data-id="${m.sender_id}">🚫 بلاک</button>` : ''}
-        ${isInbox ? `<button class="icon-btn" data-action="pin" data-id="${m.id}">${m.pinned ? '📌 برداشتن پین' : '📌 پین'}</button>` : ''}
-        ${!isInbox ? `<button class="icon-btn" data-action="edit" data-id="${m.id}">✏️ ویرایش</button>` : ''}
-        <button class="icon-btn" data-action="delete" data-id="${m.id}">🗑 حذف</button>
-        ${isInbox ? `<button class="icon-btn" data-action="report" data-id="${m.id}">⚠️ گزارش</button>` : ''}
+    <div class="bubble-row ${m.is_mine ? 'mine' : 'theirs'}">
+      <div class="bubble">
+        <div class="bubble-text">${escapeHtml(m.text)}</div>
+        <div class="bubble-meta">
+          ${m.edited_at ? '<span>ویرایش‌شده</span>' : ''}
+          <span>${new Date(m.created_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>
+          ${m.is_mine ? `<span>${m.read_at ? '✓✓' : '✓'}</span>` : ''}
+        </div>
       </div>
     </div>
   `;
 }
 
-async function handleMessageAction(action, id, tab) {
+async function sendChatMessage(counterpartId) {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  input.disabled = true;
   try {
-    if (action === 'read') {
-      await api(`/api/messages/${id}/read`, { method: 'PATCH' });
-    } else if (action === 'delete') {
-      if (!confirm('حذف شود؟')) return;
-      await api(`/api/messages/${id}`, { method: 'DELETE' });
-    } else if (action === 'pin') {
-      await api(`/api/messages/${id}/pin`, { method: 'PATCH', body: { pinned: true } });
-    } else if (action === 'block') {
-      if (!confirm('این فرستنده بلاک بشه؟')) return;
-      await api('/api/blocks', { method: 'POST', body: { user_id: id } });
-    } else if (action === 'reply') {
-      const text = prompt('متن پاسخ:');
-      if (!text) return;
-      await api(`/api/messages/${id}/reply`, { method: 'POST', body: { text } });
-    } else if (action === 'edit') {
-      const text = prompt('متن جدید پیام:');
-      if (!text) return;
-      await api(`/api/messages/${id}`, { method: 'PATCH', body: { text } });
-    } else if (action === 'report') {
-      const reason = prompt('دلیل گزارش (اختیاری):') || '';
-      await api(`/api/messages/${id}/report`, { method: 'POST', body: { reason } });
-    }
-    showToast('انجام شد ✅');
-    renderRoute();
+    await api(`/api/conversations/${counterpartId}/send`, { method: 'POST', body: { text } });
+    await loadChatThread(counterpartId);
   } catch (err) {
     showToast('خطا: ' + err.message);
+  } finally {
+    input.disabled = false;
+    input.focus();
   }
 }
 
