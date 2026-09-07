@@ -7,13 +7,22 @@ html, body {
   padding: 0;
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Tahoma, sans-serif;
-  background: var(--tg-theme-bg-color, #f5f5f7);
-  color: var(--tg-theme-text-color, #111111);
+  background: var(--tg-theme-bg-color, #0e0e14);
+  color: var(--tg-theme-text-color, #f2f2f5);
 }
 
 #app {
   padding: 16px 16px 90px 16px;
   min-height: 100vh;
+}
+
+#app.fade-replay {
+  animation: fadeIn 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 a {
@@ -22,11 +31,11 @@ a {
 }
 
 .card {
-  background: var(--tg-theme-secondary-bg-color, #ffffff);
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .card-title {
@@ -69,7 +78,7 @@ a {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  background: var(--tg-theme-button-color, #5a8dee);
+  background: var(--tg-theme-button-color, #7c6cf6);
   color: var(--tg-theme-button-text-color, #ffffff);
   width: 100%;
 }
@@ -79,8 +88,8 @@ a {
 }
 
 .btn.secondary {
-  background: var(--tg-theme-secondary-bg-color, #eef0f4);
-  color: var(--tg-theme-text-color, #111111);
+  background: var(--tg-theme-secondary-bg-color, #1f1f29);
+  color: var(--tg-theme-text-color, #f2f2f5);
 }
 
 .btn.danger {
@@ -103,9 +112,9 @@ a {
 
 .input, textarea.input {
   width: 100%;
-  border: 1px solid var(--tg-theme-hint-color, #d8dbe0);
-  background: var(--tg-theme-bg-color, #ffffff);
-  color: var(--tg-theme-text-color, #111111);
+  border: 1px solid var(--tg-theme-hint-color, #3a3a45);
+  background: var(--tg-theme-bg-color, #14141b);
+  color: var(--tg-theme-text-color, #f2f2f5);
   border-radius: 12px;
   padding: 12px;
   font-size: 14px;
@@ -114,14 +123,14 @@ a {
 }
 
 .muted {
-  color: var(--tg-theme-hint-color, #8b8f97);
+  color: var(--tg-theme-hint-color, #9a9aa5);
   font-size: 13px;
 }
 
 .empty-state {
   text-align: center;
   padding: 40px 16px;
-  color: var(--tg-theme-hint-color, #8b8f97);
+  color: var(--tg-theme-hint-color, #9a9aa5);
 }
 
 .empty-state .emoji {
@@ -133,8 +142,8 @@ a {
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid var(--tg-theme-hint-color, #d8dbe0);
-  border-top-color: var(--tg-theme-button-color, #5a8dee);
+  border: 3px solid var(--tg-theme-hint-color, #3a3a45);
+  border-top-color: var(--tg-theme-button-color, #7c6cf6);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 30px auto;
@@ -168,27 +177,27 @@ a {
   text-align: center;
   padding: 10px;
   border-radius: 10px;
-  background: var(--tg-theme-secondary-bg-color, #eef0f4);
+  background: var(--tg-theme-secondary-bg-color, #1f1f29);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .tab.active {
-  background: var(--tg-theme-button-color, #5a8dee);
+  background: var(--tg-theme-button-color, #7c6cf6);
   color: var(--tg-theme-button-text-color, #ffffff);
 }
 
 .message-item {
   padding: 14px;
   border-radius: 14px;
-  background: var(--tg-theme-secondary-bg-color, #ffffff);
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
   margin-bottom: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .message-item.unread {
-  border-right: 3px solid var(--tg-theme-button-color, #5a8dee);
+  border-right: 3px solid var(--tg-theme-button-color, #7c6cf6);
 }
 
 .message-text {
@@ -203,7 +212,7 @@ a {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--tg-theme-hint-color, #8b8f97);
+  color: var(--tg-theme-hint-color, #9a9aa5);
 }
 
 .message-actions {
@@ -215,7 +224,7 @@ a {
 
 .icon-btn {
   border: none;
-  background: var(--tg-theme-bg-color, #eef0f4);
+  background: var(--tg-theme-bg-color, #1f1f29);
   border-radius: 10px;
   padding: 8px 10px;
   font-size: 13px;
@@ -230,12 +239,12 @@ a {
 }
 
 .gift-card {
-  background: var(--tg-theme-secondary-bg-color, #ffffff);
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
   border-radius: 14px;
   padding: 14px;
   text-align: center;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .gift-card .gift-emoji {
@@ -251,7 +260,7 @@ a {
 
 .gift-card .gift-price {
   font-size: 12px;
-  color: var(--tg-theme-hint-color, #8b8f97);
+  color: var(--tg-theme-hint-color, #9a9aa5);
   margin-top: 4px;
 }
 
@@ -260,7 +269,7 @@ a {
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid var(--tg-theme-hint-color, #eaeaea);
+  border-bottom: 1px solid var(--tg-theme-hint-color, #2a2a35);
 }
 
 .setting-row:last-child {
@@ -283,7 +292,7 @@ a {
 .slider {
   position: absolute;
   inset: 0;
-  background: var(--tg-theme-hint-color, #d8dbe0);
+  background: var(--tg-theme-hint-color, #3a3a45);
   border-radius: 999px;
   transition: 0.2s;
   cursor: pointer;
@@ -302,7 +311,7 @@ a {
 }
 
 input:checked + .slider {
-  background: var(--tg-theme-button-color, #5a8dee);
+  background: var(--tg-theme-button-color, #7c6cf6);
 }
 
 input:checked + .slider::before {
@@ -315,8 +324,8 @@ input:checked + .slider::before {
   left: 0;
   right: 0;
   display: flex;
-  background: var(--tg-theme-secondary-bg-color, #ffffff);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
   z-index: 50;
 }
@@ -328,12 +337,12 @@ input:checked + .slider::before {
   align-items: center;
   gap: 2px;
   font-size: 11px;
-  color: var(--tg-theme-hint-color, #8b8f97);
+  color: var(--tg-theme-hint-color, #9a9aa5);
   position: relative;
 }
 
 .nav-item.active {
-  color: var(--tg-theme-button-color, #5a8dee);
+  color: var(--tg-theme-button-color, #7c6cf6);
 }
 
 .nav-icon {
