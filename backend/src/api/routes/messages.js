@@ -2,7 +2,12 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const supabase = require('../../lib/supabaseClient');
 const { isBlocked } = require('../../lib/blockService');
-const { notifyNewMessage, notifyMessageSeen } = require('../../lib/notify');
+const {
+  notifyNewMessage,
+  notifyMessageSeen,
+  editDeliveredMessage,
+  deleteDeliveredMessage,
+} = require('../../lib/notify');
 
 const router = express.Router();
 
@@ -284,6 +289,19 @@ router.patch('/:id', async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 
+  // Propagate the edit to the copy already delivered in the receiver's chat.
+  const { data: receiver } = await supabase
+    .from('users')
+    .select('telegram_user_id')
+    .eq('id', message.receiver_id)
+    .maybeSingle();
+
+  if (receiver && message.telegram_message_id) {
+    editDeliveredMessage(receiver.telegram_user_id, message.telegram_message_id, message.id, text.trim()).catch(
+      (err) => console.error('editDeliveredMessage failed:', err.message)
+    );
+  }
+
   res.json({ ok: true });
 });
 
@@ -291,7 +309,8 @@ router.delete('/:id', async (req, res) => {
   const message = await loadOwnedMessage(req, res, req.params.id);
   if (!message) return;
 
-  const field = message.sender_id === req.user.id ? 'deleted_at_sender' : 'deleted_at_receiver';
+  const isSender = message.sender_id === req.user.id;
+  const field = isSender ? 'deleted_at_sender' : 'deleted_at_receiver';
 
   const { error } = await supabase
     .from('messages')
@@ -301,6 +320,27 @@ router.delete('/:id', async (req, res) => {
   if (error) {
     console.error('delete: update failed:', error.message);
     return res.status(500).json({ error: 'Internal error' });
+  }
+
+  // If the SENDER deletes their own message, unsend it from the
+  // receiver's Telegram chat too, and hide it from their inbox.
+  if (isSender && message.telegram_message_id) {
+    const { data: receiver } = await supabase
+      .from('users')
+      .select('telegram_user_id')
+      .eq('id', message.receiver_id)
+      .maybeSingle();
+
+    if (receiver) {
+      deleteDeliveredMessage(receiver.telegram_user_id, message.telegram_message_id).catch((err) =>
+        console.error('deleteDeliveredMessage failed:', err.message)
+      );
+    }
+
+    await supabase
+      .from('messages')
+      .update({ deleted_at_receiver: new Date().toISOString() })
+      .eq('id', message.id);
   }
 
   res.json({ ok: true });
