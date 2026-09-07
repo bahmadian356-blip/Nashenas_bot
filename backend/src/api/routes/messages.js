@@ -6,8 +6,6 @@ const { notifyNewMessage, notifyMessageSeen } = require('../../lib/notify');
 
 const router = express.Router();
 
-// Stricter limiter just for sending — the global API limiter (server.js)
-// already covers general abuse, this specifically curbs message spam.
 const sendLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -18,10 +16,6 @@ const sendLimiter = rateLimit({
 
 const MAX_MESSAGE_LENGTH = 2000;
 
-// ---------------------------------------------------------------------
-// POST /api/messages/send  { slug, text }
-// Sends an anonymous message to the owner of the given link slug.
-// ---------------------------------------------------------------------
 router.post('/send', sendLimiter, async (req, res) => {
   const { slug, text } = req.body || {};
 
@@ -88,19 +82,13 @@ router.post('/send', sendLimiter, async (req, res) => {
     return res.status(500).json({ error: 'Internal error' });
   }
 
-  notifyNewMessage(receiver.telegram_user_id, receiverId).catch((err) =>
-    console.error('notifyNewMessage failed:', err.message)
+  notifyNewMessage(receiver.telegram_user_id, { id: message.id, text: text.trim(), receiver_id: receiverId }).catch(
+    (err) => console.error('notifyNewMessage failed:', err.message)
   );
 
   res.status(201).json({ id: message.id, created_at: message.created_at });
 });
 
-// ---------------------------------------------------------------------
-// GET /api/messages/inbox?limit=&before=
-// Messages received by the current user. Sender identity is NEVER
-// included beyond the opaque internal id (needed for block/reply
-// actions) — no telegram_username, display_name, or avatar of the sender.
-// ---------------------------------------------------------------------
 router.get('/inbox', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
   let query = supabase
@@ -124,12 +112,6 @@ router.get('/inbox', async (req, res) => {
   res.json({ messages: data });
 });
 
-// ---------------------------------------------------------------------
-// GET /api/messages/outbox?limit=&before=
-// Messages the current user has sent. Since the sender deliberately
-// chose the recipient's link, showing the recipient's public info here
-// is fine (it's not the anonymity boundary — only sender->receiver is).
-// ---------------------------------------------------------------------
 router.get('/outbox', async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
   let query = supabase
@@ -155,9 +137,6 @@ router.get('/outbox', async (req, res) => {
   res.json({ messages: data });
 });
 
-// Helper: loads a message and ensures the current user is either the
-// sender or the receiver of it. Returns null (and has already responded)
-// if not found / not authorized.
 async function loadOwnedMessage(req, res, messageId) {
   const { data: message, error } = await supabase
     .from('messages')
@@ -181,9 +160,6 @@ async function loadOwnedMessage(req, res, messageId) {
   return message;
 }
 
-// ---------------------------------------------------------------------
-// PATCH /api/messages/:id/read — receiver marks a message as seen
-// ---------------------------------------------------------------------
 router.patch('/:id/read', async (req, res) => {
   const message = await loadOwnedMessage(req, res, req.params.id);
   if (!message) return;
@@ -192,7 +168,7 @@ router.patch('/:id/read', async (req, res) => {
     return res.status(403).json({ error: 'Only the receiver can mark a message as read' });
   }
   if (message.read_at) {
-    return res.json({ ok: true }); // already read, idempotent
+    return res.json({ ok: true });
   }
 
   const { error } = await supabase
@@ -221,13 +197,6 @@ router.patch('/:id/read', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------------------------------------------------------------------
-// POST /api/messages/:id/reply  { text }
-// Only the receiver of the original message may reply — this creates a
-// brand-new message with sender/receiver swapped, linked via
-// reply_to_message_id. The original sender remains anonymous to the
-// (new) receiver just like any other message.
-// ---------------------------------------------------------------------
 router.post('/:id/reply', async (req, res) => {
   const { text } = req.body || {};
   if (!text || typeof text !== 'string' || !text.trim()) {
@@ -276,17 +245,16 @@ router.post('/:id/reply', async (req, res) => {
     .maybeSingle();
 
   if (replyReceiver) {
-    notifyNewMessage(replyReceiver.telegram_user_id, original.sender_id).catch((err) =>
-      console.error('notifyNewMessage (reply) failed:', err.message)
-    );
+    notifyNewMessage(replyReceiver.telegram_user_id, {
+      id: newMessage.id,
+      text: text.trim(),
+      receiver_id: original.sender_id,
+    }).catch((err) => console.error('notifyNewMessage (reply) failed:', err.message));
   }
 
   res.status(201).json({ id: newMessage.id, created_at: newMessage.created_at });
 });
 
-// ---------------------------------------------------------------------
-// PATCH /api/messages/:id  { text } — sender edits their own message
-// ---------------------------------------------------------------------
 router.patch('/:id', async (req, res) => {
   const { text } = req.body || {};
   if (!text || typeof text !== 'string' || !text.trim()) {
@@ -319,10 +287,6 @@ router.patch('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------------------------------------------------------------------
-// DELETE /api/messages/:id — soft delete, scoped to whichever side
-// (sender/receiver) the current user is on.
-// ---------------------------------------------------------------------
 router.delete('/:id', async (req, res) => {
   const message = await loadOwnedMessage(req, res, req.params.id);
   if (!message) return;
@@ -342,9 +306,6 @@ router.delete('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------------------------------------------------------------------
-// PATCH /api/messages/:id/pin — receiver pins/unpins a message in their inbox
-// ---------------------------------------------------------------------
 router.patch('/:id/pin', async (req, res) => {
   const { pinned } = req.body || {};
   const message = await loadOwnedMessage(req, res, req.params.id);
@@ -367,9 +328,6 @@ router.patch('/:id/pin', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------------------------------------------------------------------
-// POST /api/messages/:id/report  { reason }
-// ---------------------------------------------------------------------
 router.post('/:id/report', async (req, res) => {
   const { reason } = req.body || {};
   const message = await loadOwnedMessage(req, res, req.params.id);
