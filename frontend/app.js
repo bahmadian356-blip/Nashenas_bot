@@ -1,5 +1,5 @@
 // =====================================================================
-// CONFIG — change this to your deployed backend URL on Render
+// CONFIG
 // =====================================================================
 const API_BASE = 'https://nashenas-bot-2.onrender.com';
 
@@ -97,6 +97,9 @@ async function renderRoute() {
     if (match) {
       const app = document.getElementById('app');
       app.innerHTML = '<div class="spinner"></div>';
+      app.classList.remove('fade-replay');
+      void app.offsetWidth;
+      app.classList.add('fade-replay');
       try {
         await routes[pattern](match, params);
       } catch (err) {
@@ -165,7 +168,7 @@ async function refreshUnreadBadge() {
       badge.classList.add('hidden');
     }
   } catch (e) {
-    /* silent — badge is best-effort */
+    /* silent */
   }
 }
 
