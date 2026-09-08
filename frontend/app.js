@@ -10,24 +10,6 @@ const tg = window.Telegram ? window.Telegram.WebApp : null;
 if (tg) {
   tg.ready();
   tg.expand();
-  applyTelegramTheme();
-  tg.onEvent('themeChanged', applyTelegramTheme);
-}
-
-function applyTelegramTheme() {
-  if (!tg || !tg.themeParams) return;
-  const root = document.documentElement;
-  const map = {
-    bg_color: '--tg-theme-bg-color',
-    text_color: '--tg-theme-text-color',
-    hint_color: '--tg-theme-hint-color',
-    button_color: '--tg-theme-button-color',
-    button_text_color: '--tg-theme-button-text-color',
-    secondary_bg_color: '--tg-theme-secondary-bg-color',
-  };
-  for (const [key, cssVar] of Object.entries(map)) {
-    if (tg.themeParams[key]) root.style.setProperty(cssVar, tg.themeParams[key]);
-  }
 }
 
 function getInitData() {
@@ -89,6 +71,7 @@ function parseHash() {
 }
 
 let chatPollTimer = null;
+let chatLastSignature = null;
 
 async function renderRoute() {
   const { path, params } = parseHash();
@@ -282,12 +265,13 @@ route('/messages', async () => {
 route('/chat/:id', async (match) => {
   document.body.classList.add('chat-open');
   clearInterval(chatPollTimer);
+  chatLastSignature = null;
 
-  await loadChatThread(match.id);
+  await loadChatThread(match.id, false);
   chatPollTimer = setInterval(() => loadChatThread(match.id, true), 4000);
 });
 
-async function loadChatThread(counterpartId, silent = false) {
+async function loadChatThread(counterpartId, silent) {
   let data;
   try {
     data = await api(`/api/conversations/${counterpartId}`);
@@ -299,10 +283,27 @@ async function loadChatThread(counterpartId, silent = false) {
   }
 
   const { counterpart, messages } = data;
-  const app = document.getElementById('app');
 
-  const wasNearBottom =
-    !silent || (app.querySelector('#chat-scroll') && isNearBottom(app.querySelector('#chat-scroll')));
+  const signature = messages.map((m) => `${m.id}:${m.text}:${m.edited_at || ''}:${m.read_at || ''}`).join('|');
+
+  if (silent && signature === chatLastSignature) {
+    return;
+  }
+  chatLastSignature = signature;
+
+  const app = document.getElementById('app');
+  const existingScroll = document.getElementById('chat-scroll');
+  const existingInput = document.getElementById('chat-input');
+
+  const wasNearBottom = !existingScroll || isNearBottom(existingScroll);
+  const preservedText = existingInput ? existingInput.value : '';
+  const hadFocus = existingInput === document.activeElement;
+
+  if (silent && existingScroll) {
+    existingScroll.innerHTML = messages.map(renderBubble).join('');
+    if (wasNearBottom) existingScroll.scrollTop = existingScroll.scrollHeight;
+    return;
+  }
 
   const statusLine = counterpart.is_online
     ? '🟢 آنلاین'
@@ -331,7 +332,7 @@ async function loadChatThread(counterpartId, silent = false) {
     </div>
 
     <div class="composer">
-      <textarea class="input" id="chat-input" rows="1" placeholder="پیامت رو بنویس..."></textarea>
+      <textarea class="input" id="chat-input" rows="1" placeholder="پیامت رو بنویس...">${escapeHtml(preservedText)}</textarea>
       <button class="btn small" id="chat-send-btn">ارسال</button>
     </div>
   `;
@@ -339,8 +340,11 @@ async function loadChatThread(counterpartId, silent = false) {
   const scrollEl = document.getElementById('chat-scroll');
   if (wasNearBottom) scrollEl.scrollTop = scrollEl.scrollHeight;
 
+  const inputEl = document.getElementById('chat-input');
+  if (hadFocus) inputEl.focus();
+
   document.getElementById('chat-send-btn').onclick = () => sendChatMessage(counterpartId);
-  document.getElementById('chat-input').addEventListener('keydown', (e) => {
+  inputEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendChatMessage(counterpartId);
