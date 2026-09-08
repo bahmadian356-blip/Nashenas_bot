@@ -384,3 +384,116 @@ input:checked + .slider::before {
 .hidden {
   display: none !important;
 }
+/* ---------- Conversations list ---------- */
+
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+/* ---------- Chat thread (full-screen, Telegram-like) ---------- */
+
+body.chat-open .bottom-nav {
+  display: none;
+}
+
+body.chat-open #app {
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 12px 16px;
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 6px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bubble-row {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.bubble-row.mine {
+  justify-content: flex-start;
+}
+
+.bubble-row.theirs {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 78%;
+  padding: 10px 13px;
+  border-radius: 16px;
+  animation: bubbleIn 0.18s ease;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bubble-row.mine .bubble {
+  background: linear-gradient(135deg, #7c6cf6, #5a8dee);
+  color: #ffffff;
+  border-bottom-left-radius: 4px;
+}
+
+.bubble-row.theirs .bubble {
+  background: var(--tg-theme-secondary-bg-color, #1f1f29);
+  color: var(--tg-theme-text-color, #f2f2f5);
+  border-bottom-right-radius: 4px;
+}
+
+.bubble-text {
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubble-meta {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  font-size: 10.5px;
+  opacity: 0.75;
+  margin-top: 4px;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  background: var(--tg-theme-secondary-bg-color, #1b1b24);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.composer .input {
+  flex: 1;
+  max-height: 100px;
+}
+
+.composer .btn {
+  width: auto;
+  flex-shrink: 0;
+}
