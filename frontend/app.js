@@ -86,12 +86,11 @@ async function renderRoute() {
     const match = matchRoute(pattern, path);
     if (match) {
       const app = document.getElementById('app');
-      app.innerHTML = '<div class="spinner"></div>';
-      app.classList.remove('fade-replay');
-      void app.offsetWidth;
-      app.classList.add('fade-replay');
       try {
         await routes[pattern](match, params);
+        app.classList.remove('fade-replay');
+        void app.offsetWidth;
+        app.classList.add('fade-replay');
       } catch (err) {
         app.innerHTML = `<div class="empty-state"><span class="emoji">⚠️</span>${escapeHtml(err.message)}</div>`;
       }
@@ -100,7 +99,6 @@ async function renderRoute() {
   }
   document.getElementById('app').innerHTML = '<div class="empty-state">صفحه پیدا نشد</div>';
 }
-
 function matchRoute(pattern, path) {
   const patternParts = pattern.split('/').filter(Boolean);
   const pathParts = path.split('/').filter(Boolean);
